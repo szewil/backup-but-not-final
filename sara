@@ -1,0 +1,264 @@
+import pygame, csv, os ,math
+width=1440
+height=810
+window=pygame.display.set_mode((width,height))
+canvas = pygame.Surface((width,height))
+pygame.init()
+
+class Tile(object):
+    def __init__(self,image,x,y):
+        self.width=45
+        self.height=45
+        self.image=pygame.transform.scale(pygame.image.load(f'{image}'),(self.width,self.height))
+        self.x=x
+        self.y=y
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+    def draw(self):
+        window.blit(self.image,(self.x,self.y))
+class Box (Tile):
+    def __init__(self,image,x,y):
+        self.width=45
+        self.height=45
+        self.image=pygame.transform.scale(pygame.image.load(f'{image}'),(self.width,self.height))
+        self.x=x
+        self.y=y
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+    def BoxReinitiate(self):
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+class Switch(Tile):
+    def __init__(self,image,x,y):
+        self.width=45
+        self.height=45
+        self.image=pygame.transform.scale(pygame.image.load(f'{image}'),(self.width,self.height))
+        self.x=x
+        self.y=y
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+    def SwitchReinitiate(self):
+        self.x=x
+        self.y=y
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+    
+class TileMap():
+    def __init__(self, filename,tilesize):
+        self.start_x, self.start_y = 0, 0
+        self.tile_size=45
+        self.tiles = self.load_tiles(filename)
+        self.map_surface = pygame.Surface((self.map_w, self.map_h))
+        self.map_surface.set_colorkey((0, 0, 0))
+        self.load_map()
+
+    def draw_map(self, surface):
+        window.blit(self.map_surface, (0, 0))
+
+    def load_map(self):
+        for lists in self.tiles:
+            for tile in lists:
+                tile.draw()
+
+    def read_csv(self, filename):
+        mapp = []
+        with open(os.path.join(filename)) as data:
+            data = csv.reader(data, delimiter=',')
+            for row in data:
+                mapp.append(list(row))
+        return mapp
+
+    def load_tiles(self, filename):
+        tiles = []
+        diamonds=[]
+        switches=[]
+        boxes=[]
+        mapp = self.read_csv(filename)
+        x1, y1 = 0,0
+        for row in mapp:
+            x1 = 0
+            for tile in row:
+                #tilesDic[Tile.y]=row
+                if tile == '77':
+                    tiles.append(Tile('grassHillRight.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '81':
+                    tiles.append(Tile('grass.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '65':
+                    tiles.append(Tile('grassCenter_rounded.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '4':
+                    diamonds.append(Tile('hud_gem_blue.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '3':
+                    diamonds.append(Tile('hud_gem_red.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '6':
+                    diamonds.append(Tile('keyBlue.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '5':
+                    diamonds.append(Tile('keyRed.png', x1 * self.tile_size, y1 * self.tile_size))
+#                 elif tile == '86':
+#                     switches.append(Switch('switchRight.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '1':
+                    boxes.append(Box('boxAlt.png', x1 * self.tile_size, y1 * self.tile_size))
+                elif tile == '0':
+                    switches.append(Switch('buttonYellow.png', x1 * self.tile_size, y1 * self.tile_size))
+                #add boxes and the keys and values
+                    # Move to next tile in current row
+                x1 += 1
+
+            # Move to next row
+            y1 += 1
+            # Store the size of the tile map
+        self.map_w, self.map_h = 2240, 1260
+        return [tiles]+[switches]+[diamonds]+[boxes]
+level=TileMap("levelmap2.csv",45)
+level.draw_map(window)
+tiles=level.load_tiles("levelmap2.csv")
+class Character(object):
+    def __init__(self,image,x,y,left):
+        self.x=x
+        self.y=y
+        self.Xcoll=0
+        self.Ycoll=0
+        self.dx=10
+        self.dy=10
+        self.width=40
+        self.height=70
+        self.state="standing"
+        self.direction="stand"
+        self.acc=5
+        self.left=left
+        self.image=pygame.transform.scale(pygame.image.load(f'{image}'),(self.width,self.height))
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+        self.angle=120
+        self.initialY=self.y
+        self.timerState="stop"
+        self.timer=0
+        self.velY=-10
+        self.downRectY=pygame.Rect(self.x,self.y+25,self.width,self.height)
+    def reinitiate(self):
+        self.angle=120
+        self.rect=pygame.Rect(self.x,self.y,self.width,self.height)
+    def checkcollision(self,other):
+        print("checkcollision",self.rect, other)
+        if self.rect.x+self.width>=other.x  :
+            return "right"
+        elif self.rect.x<=other.width+other.x :
+            return "left"
+        elif self.rect.y<=other.y+other.height :
+            return "up"
+        elif self.rect.y+self.rect.height>=other.y :
+            return "down"
+    def gravity(self,other):
+#line 146 and 150 from https://www.youtube.com/watch?v=1_H7InPMjaY       
+        collideTollerence=10
+        for i in other:
+            tilerect=i.rect
+            if pygame.Rect.colliderect(self.rect,tilerect):
+                if abs(self.rect.bottom-tilerect.top)<collideTollerence:
+                    return tilerect
+        for i in other:
+            tilerect=i.rect
+            if pygame.Rect.colliderect(self.rect,tilerect):
+                return 1
+        return 0
+                
+        
+    
+    def drawCharacter(self):
+        keyPressed=pygame.key.get_pressed()
+        if self.state=="standing" or self.state=="moving":
+            if self.left=="LEFT":
+#consequenses of collision after  pressing only left              
+                if keyPressed[pygame.K_LEFT]:
+                    self.x -= self.dx
+                    self.reinitiate()
+                    for box in level.tiles[3]:
+                        boxrect=box.rect
+                        if pygame.Rect.colliderect(self.rect,boxrect):
+                            self.x -= self.dx
+                            box.rect.x-=self.dx
+                            boox.BoxReinitiate()
+                    for switch in level.tiles[1]:
+                        switchrect=switch.rect
+                        if pygame.Rect.colliderect(self.rect,switchrect):
+                            self.x -= self.dx
+                            switch.rect.x-=self.dx
+                            switch.SwitchReinitiate()
+                    for i in level.tiles[0]:
+                        tilerect=i.rect
+                        if pygame.Rect.colliderect(self.rect,tilerect):
+                            self.x += self.dx
+                            window.blit(self.image,(self.x,self.y))        
+                            self.angle-=60
+                            self.reinitiate()
+                            break           
+#consequenses of collision after  pressing only right                  
+                elif keyPressed[pygame.K_RIGHT]:
+                    self.x += self.dx
+                    self.reinitiate()
+                    for box in level.tiles[3]:
+                        boxrect=box.rect
+                        if pygame.Rect.colliderect(self.rect,boxrect):
+                            box.x+=2*self.dx
+                            self.x -= self.dx
+                            box.BoxReinitiate()
+                            window.blit(level.map_surface, (0, 0))
+                            window.blit(box.image, (box.x, box.y))
+                            #window.blit(self.image,(self.x,self.y))        
+                            self.reinitiate()
+                            break
+#                     for switch in level.tiles[1]:
+#                         switchrect=switch.rect
+#                         #if pygame.Rect.colliderect(self.rect,switchrect):
+# ##########what?
+#                             self.SwitchReinitiate()
+                    for i in level.tiles[0]:
+                        tilerect=i.rect
+                        if self.gravity(level.tiles[0])==1:
+                            self.x -= self.dx
+                            window.blit(self.image,(self.x,self.y))        
+                            self.reinitiate()
+                            break
+#                         if pygame.Rect.colliderect(self.downRectY,tilerect):
+#                             self.y=tilerect.y-tilerect.height-25
+#                             window.blit(self.image,(self.x,self.y))        
+#                             self.reinitiate()
+                if keyPressed[pygame.K_UP]:
+                    self.direction="up"
+levelimg=pygame.image.load('screenshot.png')
+def main():
+    level.draw_map(window)
+    boy=Character('BoyR1.png',100,562,"LEFT")
+    boy.drawCharacter()
+    run=True
+    clock = pygame.time.Clock()
+    while run:
+        boy.reinitiate()
+        #print(boy.gravity(level.tiles[0]))
+        if boy.gravity(level.tiles[0])==0:
+            boy.y+=5
+        else:
+            if boy.direction=="up":
+                boy.y-=boy.dy
+                boy.dy-=1
+                boy.reinitiate()
+                for i in level.tiles[0]:
+                    tilerect=i.rect
+                    if pygame.Rect.colliderect(boy.rect,tilerect):
+                        if boy.dy>0:
+                            boy.dy=-boy.dy
+                            boy.dy+=1
+                        boy.reinitiate()
+                        break
+                if boy.dy==-11:
+                    boy.direction="stand"
+                    boy.dy=10
+                    boy.reinitiate()
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type==pygame.QUIT:
+                run =False
+        
+        level.draw_map(window)
+        window.blit(levelimg,(0,0))
+        window.blit(level.map_surface, (0, 0))
+        boy.drawCharacter()
+        window.blit(boy.image,(boy.x,boy.y))
+        pygame.display.update()
+    pygame.quit()
+if __name__=="__main__":
+    main()
+     
